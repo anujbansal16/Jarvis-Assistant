@@ -3,10 +3,7 @@
 import speech_recognition as sr
 # pip install pyttsx3
 import pyttsx3
-from datetime import date
 import webbrowser
-import time
-from time import gmtime, strftime
 import wikipedia
 # pip install google
 from googlesearch import search 
@@ -15,14 +12,14 @@ from youtube_search import YoutubeSearch
 
 from classes import News
 from utilities import *
+from utilities import engine
 
 
 
 JARVISMSG="How May i help you?, Sir"
 NOTRECOGNIZED="Sorry Sir, I cant understand it"
+HELPMSG="Hello , I can do the tasks as per your commands. Try commands starting with google, open, youtube, play. I'm intelligent enough to interpret any other commands too."
 
-
-r = sr.Recognizer()
 
 newsSources={	"google":News("google",
 						{
@@ -37,7 +34,6 @@ newsSources={	"google":News("google",
 							"sports":"https://timesofindia.indiatimes.com/rssfeeds/4719148.cms"
 							
 						})}
-
 
 
 ###########################################
@@ -55,8 +51,15 @@ def wikiData(query,sentences=1):
 		return None
 
 
+
 def openTab(url):
 	webbrowser.open_new_tab(url)
+
+
+def googleSearch(query):
+	query=query.replace("google","",1)
+	url="https://www.google.com.tr/search?q={}".format(query)
+	openTab(url)
 
 def getGoogleResultLink(it):
 	try:
@@ -65,13 +68,18 @@ def getGoogleResultLink(it):
 		print("End results")
 		return None
 
-def googleSearch(query,num=1):
-	return search(query, tld="co.in", num=num, stop=10, pause=2)
+def googleRelavantPageLink(query,num=1):
+	return search(query, tld="co.in", num=num, stop=num, pause=2)
 
-def openArticles(query):
-	articles_it=googleSearch(query)
+def openRelavantWebPage(query):
+	articles_it=googleRelavantPageLink(query)
 	article_url=getGoogleResultLink(articles_it)	
-	openTab(article_url)
+	speak("Opening, Sir")
+	if article_url:
+		openTab(article_url)
+	else:
+		googleSearch(query)
+
 
 def playMusic(query):
 	results = YoutubeSearch(query, max_results=1).to_dict()
@@ -83,21 +91,19 @@ def playMusic(query):
 #
 def getNews():
 	
-	speak("I have the following souces of news")
-	
-	for s in newsSources:
-		speak(s)
-	src=listenCommand("Please let me know the souces of news from you want to listen")
-	
-	if not src:
-		return
-
-
-	print(src)
-
-	if src not in newsSources:
-		speak("Sorry sir, I dont have any source as {}".format(src))
-		return
+	speak("From which source you want to listen, Sir")
+	while True:
+		for s in newsSources:
+			speak(s)
+		src=listenCommand("Please let me know the source of news from you want to listen")
+		print(src)
+		if "bye" in src or "exit" in src:
+			return
+		elif src not in newsSources:
+			speak("Sorry sir, I dont have any source as {}".format(src))
+			speak("Available Sources are: ")
+		else:
+			break
 
 	newsO=newsSources[src]
 
@@ -107,101 +113,101 @@ def getNews():
 			newsO.speakNews(cat)
 		else:
 			speak("From which category you want to listen news, Sir")
-			for c in newsO.newsCategories:
-				speak(c)
-			cat=listenCommand("Waiting for the category,sir")
-			if not cat:
-				return
-			print(cat)
-			if cat in newsO.newsCategories:
-				newsO.speakNews(cat)
-			else:
-				speak("Sorry Sir, there is no category like that")
-	else:
-		speak("Sorry sir, i cant find any associated link with {}",src)
+			while True:
+				for c in newsO.newsCategories:
+					speak(c)
+				cat=listenCommand("Waiting for the category,sir")
+				print(cat)
+				if "bye" in cat or "return" in cat:
+					return
+				elif cat not in newsO.newsCategories:
+					speak("Sorry Sir, there is no category like that")
+					speak("Available Categories are: ")
+				else:
+					break
+			speak("Okay")
+			newsO.speakNews(cat)
 
 
 def processQuery(query):
 	if query:
-		query=query.lower()
-
-		if query.startswith("news") or query.startswith("top news") or query.startswith("open news"):
+		arr=query.split(" ")
+		resQuery=' '.join(arr[1:])
+		if arr[0]=="help":
+			print(HELPMSG)
+			speak(HELPMSG)
+		elif arr[0]=="google":
+			# query=query.replace("google","",1)
+			googleSearch(resQuery)
+		elif arr[0]=="open":
+			# query=query.replace("open","",1)
+			openRelavantWebPage(resQuery)
+		elif arr[0]=="youtube":
+			# query=query.replace("youtube","",1)
+			url="https://www.youtube.com/results?search_query={}".format(resQuery)
+			openTab(url)
+		elif arr[0]=="play":
+			# query=query.replace("youtube","",1)
+			playMusic(resQuery)
+		elif arr[0]=="news" or (arr[0]=="open" and arr[1]=="news"):
 			getNews()
-
-		elif query.startswith("google"):
-			query=query.replace("google","",1)
-			url="https://www.google.com.tr/search?q={}".format(query)
-			openTab(url)
-
-		elif query.startswith("open"):
-			speak("opening, Sir")
-			query=query.replace("open","",1)
-			openArticles(query)
-		elif "article on" in query:
-			#open google links
-			speak("opening, Sir")
-			ln=(len("article on"))
-			query=query[query.find("article on")+ln+1:]
-			print(query)
-			openArticles(query)
-
-		elif query.startswith("youtube"):
-			query=query.replace("youtube","",1)
-			url="https://www.youtube.com/results?search_query=".format(query)
-			openTab(url)
-
-		elif query.startswith("play"):
-			query=query.replace("youtube","",1)
-			playMusic(query)
-
 		else:
 			if not wikiData(query):
 				speak("Let me try to search it somewhere else for you, Sir")
 				speak("Opening on browser ,Sir" )
-				openArticles(query)
+				openRelavantWebPage(query)
 
 def listenCommand(msg):
+	r = sr.Recognizer()
 	with sr.Microphone() as source:
-		# r.pause_thresold=1
-		# r.adjust_for_ambient_noise(source,2)  
-		audio = r.adjust_for_ambient_noise(source)
-		speak(msg)
+		r.pause_thresold=1
+		# r.adjust_for_ambient_noise(source,duration=1)  
+		# audio = r.adjust_for_ambient_noise(source)
+		print(msg)
+		print("Listening...")
 		audio = r.listen(source)
 		try:
-			speak("Okay")
 			query=r.recognize_google(audio,language="en-in").lower()
 			return query
 		except Exception as e:
-			speak("Sorry, Sir I cant Recognize that, Sir")
-			query=None
+			# speak("Sorry, Sir I cant Recognize that, Sir")
+			# query=None
+			return listenCommand(msg)
 
 def startThread():
-	speak(JARVISMSG)
 	while True:
+		r = sr.Recognizer()
 		with sr.Microphone() as source:
-			# r.pause_thresold=1
-			# r.adjust_for_ambient_noise(source)  
-			audio = r.adjust_for_ambient_noise(source)
-			speak("Waiting for command , Sir")
-			audio = r.listen(source,2)
+			r.pause_thresold=1
+			# r.adjust_for_ambient_noise(source,duration=1)  
+			# audio = r.adjust_for_ambient_noise(source)
+			print("Listening...")
+			# speak("Waiting for command , Sir")
+			audio = r.listen(source)
 			try:
-				speak("Okay")
-				query=r.recognize_google(audio,language="en-in")
-				print(query)
+				query=r.recognize_google(audio,language="en-in").lower()
+				
 			except Exception as e:
-				speak("Sorry, Sir I cant Recognize that, Sir")
+				# speak("Sorry, Sir I cant Recognize that, Sir")
 				query=None
+				continue;
 			
-			if (query and ("bye" in query or query=="exit")):
-				exitMsg()
-				return
-			processQuery(query)
-
+			if True:#query.startswith("jarvis"):
+				if "bye" in query:
+					exitMsg()
+					break
+				query=query.replace("jarvis","",1)
+				print(query)	
+				speak("Okay")
+				processQuery(query)
+			else:
+				print("You are missing somthing")
 			
 		
 
 if __name__ == '__main__':
 	# greet()	
+	speak(JARVISMSG)
 	startThread()
 	# getNews()
 	# newsSources["times of india"].speakNews("top stories")

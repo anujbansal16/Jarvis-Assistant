@@ -25,9 +25,9 @@ class News(object):
 			desc=remove_html_tags(news.description.text)
 			print(title)
 			print(desc)
-			# speak("News: {}".format(count))
-			# speak(title)
-			# speak(desc)
+			speak("News: {}".format(count))
+			speak(title)
+			speak(desc)
 			print("-"*60)
 			count+=1
 			if count>5:
